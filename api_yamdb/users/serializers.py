@@ -55,3 +55,7 @@ class UserSerializer(serializers.ModelSerializer):
             'username', 'email', 'first_name',
             'last_name', 'bio', 'role'
         )
+        extra_kwargs = {
+            'email': {'required': True},
+            'username': {'required': True},
+        }
