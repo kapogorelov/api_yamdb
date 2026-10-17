@@ -63,7 +63,7 @@ curl -X POST http://127.0.0.1:8000/api/v1/titles/1/reviews/ \
   -d '{"text": "Отличный фильм!", "score": 9}'
 ```
 
-## Импорт данных из CSV
+# Импорт данных из CSV
 
 ```bash
 python manage.py import_csv
