@@ -19,39 +19,57 @@ source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r ../requirements.txt
 python manage.py migrate
 python manage.py runserver
+```
 
-Примеры запросов
+## Примеры запросов
 
 # 1. Регистрация
+
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/auth/signup/ \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "username": "user"}'
+```
 
 # 2. Получение токена (код придёт на почту / в консоль)
-curl -X POST http://127.0.0.1:8000/api/v1/auth/token/ \
+
+```bash
+   curl -X POST http://127.0.0.1:8000/api/v1/auth/token/ \
   -H "Content-Type: application/json" \
   -d '{"username": "user", "confirmation_code": "КОД_ИЗ_ПОЧТЫ"}'
+```
 
 # Список произведений (доступно всем)
+
+```bash
 curl http://127.0.0.1:8000/api/v1/titles/
+```
 
 # Создать категорию (нужен токен админа)
+
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/categories/ \
   -H "Authorization: Bearer ВАШ_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{"name": "Фильмы", "slug": "films"}'
+  ```
 
 # Создать отзыв (нужен токен пользователя)
+
+```bash
 curl -X POST http://127.0.0.1:8000/api/v1/titles/1/reviews/ \
   -H "Authorization: Bearer ВАШ_ТОКЕН" \
   -H "Content-Type: application/json" \
   -d '{"text": "Отличный фильм!", "score": 9}'
+```
 
-  Импорт данных из CSV
+## Импорт данных из CSV
 
+```bash
 python manage.py import_csv
+```
 
-Основные эндпоинты
+## Основные эндпоинты
 
 Метод,Эндпоинт,Описание
 POST,/api/v1/auth/signup/,Регистрация
@@ -64,7 +82,7 @@ GET/POST,/api/v1/titles/,Произведения
 GET/POST,/api/v1/titles/{id}/reviews/,Отзывы
 GET/POST,/api/v1/titles/{id}/reviews/{id}/comments/,Комментарии
 
-Авторы
+## Авторы
 
 Тимлид: kapogorelov
 Разработчики: abramlinkolna-coder, DmitriiGordeev
