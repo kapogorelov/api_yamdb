@@ -1,5 +1,6 @@
 from django.db import models
 from django.core.validators import MaxValueValidator, MinValueValidator
+from django.conf import settings
 
 # from users.models import User
 # from titles.models import Title
@@ -7,14 +8,14 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 
 class Review(models.Model):
     title = models.ForeignKey(
-        Title,
+        'Title',
         on_delete=models.CASCADE,
         related_name='reviews',
         verbose_name='Произведение'
     )
     text = models.TextField(verbose_name='Текст отзыва')
     author = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='reviews',
         verbose_name='Автор'
@@ -53,7 +54,7 @@ class Comment(models.Model):
     )
     text = models.TextField(verbose_name='Текст комментария')
     author = models.ForeignKey(
-        User,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='comments',
         verbose_name='Автор'
