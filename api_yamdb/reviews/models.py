@@ -1,14 +1,11 @@
-from django.db import models
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.conf import settings
-
-# from users.models import User
-# from titles.models import Title
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models
 
 
 class Review(models.Model):
     title = models.ForeignKey(
-        'Title',
+        Title,
         on_delete=models.CASCADE,
         related_name='reviews',
         verbose_name='Произведение'
@@ -23,8 +20,8 @@ class Review(models.Model):
     score = models.PositiveSmallIntegerField(
         verbose_name='Оценка',
         validators=[
-            MinValueValidator(1, message='Оценка не может быть меньше 1'),
-            MaxValueValidator(10, message='Оценка не может быть больше 10')
+            MinValueValidator(1, message='Оценка от 1 до 10'),
+            MaxValueValidator(10, message='Оценка от 1 до 10')
         ]
     )
     pub_date = models.DateTimeField(
@@ -43,6 +40,9 @@ class Review(models.Model):
                 name='unique_review'
             )
         ]
+
+    def __str__(self):
+        return self.text[:30]
 
 
 class Comment(models.Model):
@@ -69,3 +69,6 @@ class Comment(models.Model):
         verbose_name = 'Комментарий'
         verbose_name_plural = 'Комментарии'
         ordering = ('-pub_date',)
+
+    def __str__(self):
+        return self.text[:30]
