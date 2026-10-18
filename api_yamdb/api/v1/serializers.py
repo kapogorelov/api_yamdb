@@ -1,8 +1,16 @@
+from datetime import date
+
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueValidator
 
-from api_yamdb.constants import SCORE_MAX, SCORE_MIN
+from api_yamdb.constants import (
+    EMAIL_MAX_LENGTH, SCORE_MAX, SCORE_MIN, USERNAME_MAX_LENGTH
+)
 from reviews.models import Category, Comment, Genre, Review, Title
+
+User = get_user_model()
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -47,7 +55,6 @@ class TitleWriteSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'year', 'description', 'genre', 'category')
 
     def validate_year(self, value):
-        from datetime import date
         if value > date.today().year:
             raise ValidationError('Год не может быть больше текущего.')
         return value
@@ -93,3 +100,73 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ('id', 'text', 'author', 'pub_date')
+
+
+class SignUpSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=EMAIL_MAX_LENGTH)
+    username = serializers.RegexField(
+        regex=r'^[\w.@+-]+\Z',
+        max_length=USERNAME_MAX_LENGTH,
+        required=True
+    )
+
+    def validate_username(self, value):
+        if value.lower() == 'me':
+            raise serializers.ValidationError(
+                'Использовать имя "me" в качестве username запрещено.'
+            )
+        return value
+
+    def validate(self, data):
+        username = data.get('username')
+        email = data.get('email')
+        user_by_username = User.objects.filter(username=username).first()
+        user_by_email = User.objects.filter(email=email).first()
+
+        if user_by_username and user_by_email:
+            if user_by_username != user_by_email:
+                raise serializers.ValidationError(
+                    'Username и email принадлежат разным пользователям.'
+                )
+        elif user_by_username and not user_by_email:
+            raise serializers.ValidationError(
+                'Пользователь с таким username уже существует.'
+            )
+        elif user_by_email and not user_by_username:
+            raise serializers.ValidationError(
+                'Пользователь с таким email уже существует.'
+            )
+        return data
+
+
+class TokenSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    confirmation_code = serializers.CharField(required=True)
+
+
+class UserSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(
+        max_length=EMAIL_MAX_LENGTH,
+        required=True,
+        validators=[UniqueValidator(queryset=User.objects.all())]
+    )
+    username = serializers.RegexField(
+        regex=r'^[\w.@+-]+\Z',
+        max_length=USERNAME_MAX_LENGTH,
+        required=True,
+        validators=[UniqueValidator(queryset=User.objects.all())]
+    )
+
+    class Meta:
+        model = User
+        fields = (
+            'username', 'email', 'first_name',
+            'last_name', 'bio', 'role'
+        )
+
+    def validate_username(self, value):
+        if value.lower() == 'me':
+            raise serializers.ValidationError(
+                'Использовать имя "me" запрещено.'
+            )
+        return value
