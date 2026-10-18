@@ -1,6 +1,8 @@
+import uuid
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
@@ -138,10 +140,44 @@ class SignUpSerializer(serializers.Serializer):
             )
         return data
 
+    def create(self, validated_data):
+        username = validated_data['username']
+        email = validated_data['email']
+        user, _ = User.objects.get_or_create(
+            username=username,
+            defaults={'email': email}
+        )
+        confirmation_code = str(uuid.uuid4())
+        user.confirmation_code = confirmation_code
+        user.save()
+        send_mail(
+            subject='Код подтверждения YaMDb',
+            message=f'Ваш код подтверждения: {confirmation_code}',
+            from_email='yamdb@example.com',
+            recipient_list=[email],
+            fail_silently=False,
+        )
+        return user
+
 
 class TokenSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
     confirmation_code = serializers.CharField(required=True)
+
+    def validate(self, data):
+        username = data.get('username')
+        confirmation_code = data.get('confirmation_code')
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            data['user'] = None
+            return data
+        if user.confirmation_code != confirmation_code:
+            raise serializers.ValidationError(
+                {'confirmation_code': 'Неверный код подтверждения.'}
+            )
+        data['user'] = user
+        return data
 
 
 class UserSerializer(serializers.ModelSerializer):

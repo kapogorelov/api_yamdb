@@ -1,7 +1,4 @@
-import uuid
-
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -141,34 +138,9 @@ class SignUpView(APIView):
     def post(self, request):
         serializer = SignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        username = serializer.validated_data['username']
-        email = serializer.validated_data['email']
-
-        user, created = User.objects.get_or_create(
-            username=username,
-            defaults={'email': email}
-        )
-
-        if not created and user.email != email:
-            return Response(
-                {'email': 'Email не совпадает с существующим пользователем.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        confirmation_code = str(uuid.uuid4())
-        user.confirmation_code = confirmation_code
-        user.save()
-
-        send_mail(
-            subject='Код подтверждения YaMDb',
-            message=f'Ваш код подтверждения: {confirmation_code}',
-            from_email='yamdb@example.com',
-            recipient_list=[email],
-            fail_silently=False,
-        )
-
+        user = serializer.save()
         return Response(
-            {'email': email, 'username': username},
+            {'email': user.email, 'username': user.username},
             status=status.HTTP_200_OK
         )
 
@@ -179,17 +151,12 @@ class TokenView(APIView):
     def post(self, request):
         serializer = TokenSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        username = serializer.validated_data['username']
-        confirmation_code = serializer.validated_data['confirmation_code']
-
-        user = get_object_or_404(User, username=username)
-
-        if user.confirmation_code != confirmation_code:
+        user = serializer.validated_data.get('user')
+        if not user:
             return Response(
-                {'confirmation_code': 'Неверный код подтверждения.'},
-                status=status.HTTP_400_BAD_REQUEST
+                {'username': 'Пользователь не найден.'},
+                status=status.HTTP_404_NOT_FOUND
             )
-
         token = AccessToken.for_user(user)
         return Response({'token': str(token)}, status=status.HTTP_200_OK)
 
