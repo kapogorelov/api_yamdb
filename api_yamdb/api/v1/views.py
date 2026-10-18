@@ -23,8 +23,6 @@ User = get_user_model()
 
 
 class PatchModelMixin:
-    """Миксин только для PATCH (без PUT)."""
-
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
         serializer = self.get_serializer(
@@ -69,10 +67,8 @@ class TitleViewSet(
     viewsets.GenericViewSet,
 ):
     queryset = (
-        Title.objects
-        .annotate(rating=Avg('reviews__score'))
-        .select_related('category')
-        .prefetch_related('genre')
+        Title.objects.annotate(rating=Avg('reviews__score'))
+        .select_related('category').prefetch_related('genre')
     )
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -118,8 +114,7 @@ class CommentViewSet(
 
     def get_review(self):
         return get_object_or_404(
-            Review,
-            pk=self.kwargs.get('review_id'),
+            Review, pk=self.kwargs.get('review_id'),
             title_id=self.kwargs.get('title_id')
         )
 
@@ -127,9 +122,7 @@ class CommentViewSet(
         return self.get_review().comments.all()
 
     def perform_create(self, serializer):
-        serializer.save(
-            author=self.request.user, review=self.get_review()
-        )
+        serializer.save(author=self.request.user, review=self.get_review())
 
 
 class SignUpView(APIView):
@@ -171,18 +164,16 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
-        methods=['get', 'patch'],
-        detail=False,
-        permission_classes=(IsAuthenticated,),
-        url_path='me'
+        methods=['get', 'patch'], detail=False,
+        permission_classes=(IsAuthenticated,), url_path='me'
     )
     def me(self, request):
         user = request.user
         if request.method == 'GET':
-            serializer = self.get_serializer(user)
-            return Response(serializer.data)
-
-        serializer = self.get_serializer(user, data=request.data, partial=True)
+            return Response(self.get_serializer(user).data)
+        serializer = self.get_serializer(
+            user, data=request.data, partial=True
+        )
         serializer.is_valid(raise_exception=True)
         if 'role' in serializer.validated_data and not user.is_admin:
             serializer.validated_data.pop('role')

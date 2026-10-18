@@ -35,21 +35,18 @@ class TitleReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = Title
         fields = (
-            'id', 'name', 'year', 'rating', 'description',
-            'genre', 'category'
+            'id', 'name', 'year', 'rating',
+            'description', 'genre', 'category'
         )
 
 
 class TitleWriteSerializer(serializers.ModelSerializer):
     genre = serializers.SlugRelatedField(
-        slug_field='slug',
-        queryset=Genre.objects.all(),
-        many=True,
-        allow_empty=False,
+        slug_field='slug', queryset=Genre.objects.all(),
+        many=True, allow_empty=False
     )
     category = serializers.SlugRelatedField(
-        slug_field='slug',
-        queryset=Category.objects.all(),
+        slug_field='slug', queryset=Category.objects.all()
     )
 
     class Meta:
@@ -108,8 +105,7 @@ class SignUpSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=EMAIL_MAX_LENGTH)
     username = serializers.RegexField(
         regex=r'^[\w.@+-]+\Z',
-        max_length=USERNAME_MAX_LENGTH,
-        required=True
+        max_length=USERNAME_MAX_LENGTH, required=True
     )
 
     def validate_username(self, value):
@@ -124,7 +120,6 @@ class SignUpSerializer(serializers.Serializer):
         email = data.get('email')
         user_by_username = User.objects.filter(username=username).first()
         user_by_email = User.objects.filter(email=email).first()
-
         if user_by_username and user_by_email:
             if user_by_username != user_by_email:
                 raise serializers.ValidationError(
@@ -144,8 +139,7 @@ class SignUpSerializer(serializers.Serializer):
         username = validated_data['username']
         email = validated_data['email']
         user, _ = User.objects.get_or_create(
-            username=username,
-            defaults={'email': email}
+            username=username, defaults={'email': email}
         )
         confirmation_code = str(uuid.uuid4())
         user.confirmation_code = confirmation_code
@@ -154,8 +148,7 @@ class SignUpSerializer(serializers.Serializer):
             subject='Код подтверждения YaMDb',
             message=f'Ваш код подтверждения: {confirmation_code}',
             from_email='yamdb@example.com',
-            recipient_list=[email],
-            fail_silently=False,
+            recipient_list=[email], fail_silently=False
         )
         return user
 
@@ -182,13 +175,11 @@ class TokenSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
-        max_length=EMAIL_MAX_LENGTH,
-        required=True,
+        max_length=EMAIL_MAX_LENGTH, required=True,
         validators=[UniqueValidator(queryset=User.objects.all())]
     )
     username = serializers.RegexField(
-        regex=r'^[\w.@+-]+\Z',
-        max_length=USERNAME_MAX_LENGTH,
+        regex=r'^[\w.@+-]+\Z', max_length=USERNAME_MAX_LENGTH,
         required=True,
         validators=[UniqueValidator(queryset=User.objects.all())]
     )
