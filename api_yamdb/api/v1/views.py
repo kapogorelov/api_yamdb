@@ -2,19 +2,32 @@ from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, viewsets
+from rest_framework.response import Response
 
-from api.filters import TitleFilter
-from api.permissions import IsAdminModeratorOwnerOrReadOnly
-from api.serializers import (
-    CategorySerializer,
-    CommentSerializer,
-    GenreSerializer,
-    ReviewSerializer,
-    TitleReadSerializer,
-    TitleWriteSerializer,
+from api.v1.filters import TitleFilter
+from api.v1.permissions import IsAdminModeratorOwnerOrReadOnly
+from api.v1.serializers import (
+    CategorySerializer, CommentSerializer, GenreSerializer,
+    ReviewSerializer, TitleReadSerializer, TitleWriteSerializer,
 )
 from reviews.models import Category, Genre, Review, Title
 from users.permissions import IsAdminOrReadOnly
+
+
+class PatchModelMixin:
+    """Миксин только для PATCH (без PUT)."""
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
+    def perform_update(self, serializer):
+        serializer.save()
 
 
 class CategoryGenreBaseViewSet(
@@ -23,8 +36,6 @@ class CategoryGenreBaseViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    """Общий вьюсет для категорий и жанров: список, создание, удаление."""
-
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (filters.SearchFilter,)
     search_fields = ('name',)
@@ -41,7 +52,14 @@ class GenreViewSet(CategoryGenreBaseViewSet):
     serializer_class = GenreSerializer
 
 
-class TitleViewSet(viewsets.ModelViewSet):
+class TitleViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    PatchModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = (
         Title.objects
         .annotate(rating=Avg('reviews__score'))
@@ -51,7 +69,6 @@ class TitleViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
-    http_method_names = ('get', 'post', 'patch', 'delete', 'head', 'options')
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
@@ -59,10 +76,16 @@ class TitleViewSet(viewsets.ModelViewSet):
         return TitleWriteSerializer
 
 
-class ReviewViewSet(viewsets.ModelViewSet):
+class ReviewViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    PatchModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = ReviewSerializer
     permission_classes = (IsAdminModeratorOwnerOrReadOnly,)
-    http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_title(self):
         return get_object_or_404(Title, pk=self.kwargs.get('title_id'))
@@ -71,16 +94,19 @@ class ReviewViewSet(viewsets.ModelViewSet):
         return self.get_title().reviews.all()
 
     def perform_create(self, serializer):
-        serializer.save(
-            author=self.request.user,
-            title=self.get_title()
-        )
+        serializer.save(author=self.request.user, title=self.get_title())
 
 
-class CommentViewSet(viewsets.ModelViewSet):
+class CommentViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    PatchModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = CommentSerializer
     permission_classes = (IsAdminModeratorOwnerOrReadOnly,)
-    http_method_names = ['get', 'post', 'patch', 'delete']
 
     def get_review(self):
         return get_object_or_404(
@@ -94,6 +120,5 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            author=self.request.user,
-            review=self.get_review()
+            author=self.request.user, review=self.get_review()
         )

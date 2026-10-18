@@ -11,14 +11,11 @@ class IsAdmin(permissions.BasePermission):
         )
 
 
-class IsAdminOrReadOnly(permissions.BasePermission):
+class IsAdminOrReadOnly(IsAdmin):
     """Чтение для всех, запись только для администраторов."""
 
     def has_permission(self, request, view):
         return (
             request.method in permissions.SAFE_METHODS
-            or (
-                request.user.is_authenticated
-                and (request.user.is_admin or request.user.is_superuser)
-            )
+            or super().has_permission(request, view)
         )

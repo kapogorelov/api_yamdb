@@ -1,5 +1,8 @@
 from django.contrib.auth.models import AbstractUser
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from api_yamdb.constants import EMAIL_MAX_LENGTH, ROLE_MAX_LENGTH
 
 
 class User(AbstractUser):
@@ -13,8 +16,13 @@ class User(AbstractUser):
         (ADMIN, 'Администратор'),
     )
 
+    email = models.EmailField(
+        'Email',
+        max_length=EMAIL_MAX_LENGTH,
+        unique=True,
+    )
     role = models.CharField(
-        max_length=20,
+        max_length=ROLE_MAX_LENGTH,
         choices=ROLE_CHOICES,
         default=USER,
         verbose_name='Роль'
@@ -26,12 +34,22 @@ class User(AbstractUser):
         verbose_name='Код подтверждения'
     )
 
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+
     class Meta:
         verbose_name = 'Пользователь'
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
         return self.username
+
+    def clean(self):
+        super().clean()
+        if self.username and self.username.lower() == 'me':
+            raise ValidationError(
+                {'username': 'Использовать имя "me" запрещено.'}
+            )
 
     @property
     def is_admin(self):

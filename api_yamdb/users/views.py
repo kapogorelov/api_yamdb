@@ -3,7 +3,7 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404
-from rest_framework import status, viewsets
+from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -80,14 +80,9 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = (IsAdmin,)
     lookup_field = 'username'
+    filter_backends = (filters.SearchFilter,)
+    search_fields = ('username',)
     http_method_names = ['get', 'post', 'patch', 'delete']
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        search = self.request.query_params.get('search')
-        if search:
-            queryset = queryset.filter(username__icontains=search)
-        return queryset
 
     @action(
         methods=['get', 'patch'],
