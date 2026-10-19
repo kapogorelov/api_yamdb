@@ -2,7 +2,6 @@ import uuid
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
@@ -42,11 +41,14 @@ class TitleReadSerializer(serializers.ModelSerializer):
 
 class TitleWriteSerializer(serializers.ModelSerializer):
     genre = serializers.SlugRelatedField(
-        slug_field='slug', queryset=Genre.objects.all(),
-        many=True, allow_empty=False
+        slug_field='slug',
+        queryset=Genre.objects.all(),
+        many=True,
+        allow_empty=False
     )
     category = serializers.SlugRelatedField(
-        slug_field='slug', queryset=Category.objects.all()
+        slug_field='slug',
+        queryset=Category.objects.all()
     )
 
     class Meta:
@@ -105,7 +107,8 @@ class SignUpSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=EMAIL_MAX_LENGTH)
     username = serializers.RegexField(
         regex=r'^[\w.@+-]+\Z',
-        max_length=USERNAME_MAX_LENGTH, required=True
+        max_length=USERNAME_MAX_LENGTH,
+        required=True
     )
 
     def validate_username(self, value):
@@ -144,12 +147,6 @@ class SignUpSerializer(serializers.Serializer):
         confirmation_code = str(uuid.uuid4())
         user.confirmation_code = confirmation_code
         user.save()
-        send_mail(
-            subject='Код подтверждения YaMDb',
-            message=f'Ваш код подтверждения: {confirmation_code}',
-            from_email='yamdb@example.com',
-            recipient_list=[email], fail_silently=False
-        )
         return user
 
 
@@ -175,11 +172,13 @@ class TokenSerializer(serializers.Serializer):
 
 class UserSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(
-        max_length=EMAIL_MAX_LENGTH, required=True,
+        max_length=EMAIL_MAX_LENGTH,
+        required=True,
         validators=[UniqueValidator(queryset=User.objects.all())]
     )
     username = serializers.RegexField(
-        regex=r'^[\w.@+-]+\Z', max_length=USERNAME_MAX_LENGTH,
+        regex=r'^[\w.@+-]+\Z',
+        max_length=USERNAME_MAX_LENGTH,
         required=True,
         validators=[UniqueValidator(queryset=User.objects.all())]
     )

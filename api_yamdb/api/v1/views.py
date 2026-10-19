@@ -1,4 +1,7 @@
+import uuid
+
 from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -10,30 +13,18 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken
 
 from api.v1.filters import TitleFilter
-from api.v1.permissions import IsAdminModeratorOwnerOrReadOnly
+from api.v1.mixins import PatchModelMixin
+from api.v1.permissions import (
+    IsAdmin, IsAdminModeratorOwnerOrReadOnly, IsAdminOrReadOnly
+)
 from api.v1.serializers import (
     CategorySerializer, CommentSerializer, GenreSerializer,
     ReviewSerializer, SignUpSerializer, TitleReadSerializer,
     TitleWriteSerializer, TokenSerializer, UserSerializer,
 )
 from reviews.models import Category, Genre, Review, Title
-from users.permissions import IsAdmin, IsAdminOrReadOnly
 
 User = get_user_model()
-
-
-class PatchModelMixin:
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=True
-        )
-        serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
-        return Response(serializer.data)
-
-    def perform_update(self, serializer):
-        serializer.save()
 
 
 class CategoryGenreBaseViewSet(
@@ -114,7 +105,8 @@ class CommentViewSet(
 
     def get_review(self):
         return get_object_or_404(
-            Review, pk=self.kwargs.get('review_id'),
+            Review,
+            pk=self.kwargs.get('review_id'),
             title_id=self.kwargs.get('title_id')
         )
 
@@ -122,7 +114,9 @@ class CommentViewSet(
         return self.get_review().comments.all()
 
     def perform_create(self, serializer):
-        serializer.save(author=self.request.user, review=self.get_review())
+        serializer.save(
+            author=self.request.user, review=self.get_review()
+        )
 
 
 class SignUpView(APIView):
@@ -132,10 +126,17 @@ class SignUpView(APIView):
         serializer = SignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        return Response(
-            {'email': user.email, 'username': user.username},
-            status=status.HTTP_200_OK
+        confirmation_code = str(uuid.uuid4())
+        user.confirmation_code = confirmation_code
+        user.save()
+        send_mail(
+            subject='Код подтверждения YaMDb',
+            message=f'Ваш код подтверждения: {confirmation_code}',
+            from_email='yamdb@example.com',
+            recipient_list=[user.email],
+            fail_silently=False,
         )
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class TokenView(APIView):
@@ -164,8 +165,10 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
-        methods=['get', 'patch'], detail=False,
-        permission_classes=(IsAuthenticated,), url_path='me'
+        methods=['get', 'patch'],
+        detail=False,
+        permission_classes=(IsAuthenticated,),
+        url_path='me'
     )
     def me(self, request):
         user = request.user
