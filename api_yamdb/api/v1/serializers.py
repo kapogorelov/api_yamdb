@@ -6,6 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.validators import UniqueValidator
 
+from api.v1.validators import UsernameValidatorMixin
 from api_yamdb.constants import (
     EMAIL_MAX_LENGTH, SCORE_MAX, SCORE_MIN, USERNAME_MAX_LENGTH
 )
@@ -103,20 +104,13 @@ class CommentSerializer(serializers.ModelSerializer):
         fields = ('id', 'text', 'author', 'pub_date')
 
 
-class SignUpSerializer(serializers.Serializer):
+class SignUpSerializer(UsernameValidatorMixin, serializers.Serializer):
     email = serializers.EmailField(max_length=EMAIL_MAX_LENGTH)
     username = serializers.RegexField(
         regex=r'^[\w.@+-]+\Z',
         max_length=USERNAME_MAX_LENGTH,
         required=True
     )
-
-    def validate_username(self, value):
-        if value.lower() == 'me':
-            raise serializers.ValidationError(
-                'Использовать имя "me" в качестве username запрещено.'
-            )
-        return value
 
     def validate(self, data):
         username = data.get('username')
@@ -170,7 +164,7 @@ class TokenSerializer(serializers.Serializer):
         return data
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(UsernameValidatorMixin, serializers.ModelSerializer):
     email = serializers.EmailField(
         max_length=EMAIL_MAX_LENGTH,
         required=True,
@@ -189,10 +183,3 @@ class UserSerializer(serializers.ModelSerializer):
             'username', 'email', 'first_name',
             'last_name', 'bio', 'role'
         )
-
-    def validate_username(self, value):
-        if value.lower() == 'me':
-            raise serializers.ValidationError(
-                'Использовать имя "me" запрещено.'
-            )
-        return value
