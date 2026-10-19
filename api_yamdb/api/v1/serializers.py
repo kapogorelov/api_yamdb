@@ -1,4 +1,3 @@
-import uuid
 from datetime import date
 
 from django.contrib.auth import get_user_model
@@ -138,9 +137,6 @@ class SignUpSerializer(UsernameValidatorMixin, serializers.Serializer):
         user, _ = User.objects.get_or_create(
             username=username, defaults={'email': email}
         )
-        confirmation_code = str(uuid.uuid4())
-        user.confirmation_code = confirmation_code
-        user.save()
         return user
 
 
@@ -156,11 +152,8 @@ class TokenSerializer(serializers.Serializer):
         except User.DoesNotExist:
             data['user'] = None
             return data
-        if user.confirmation_code != confirmation_code:
-            raise serializers.ValidationError(
-                {'confirmation_code': 'Неверный код подтверждения.'}
-            )
         data['user'] = user
+        data['confirmation_code'] = confirmation_code
         return data
 
 

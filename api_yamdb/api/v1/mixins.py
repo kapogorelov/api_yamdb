@@ -1,8 +1,9 @@
+from django.db.models import prefetch_related_objects
 from rest_framework.response import Response
 
 
 class PatchModelMixin:
-    """Миксин только для PATCH."""
+    """Миксин только для PATCH с сохранением функциональности DRF."""
 
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -11,6 +12,13 @@ class PatchModelMixin:
         )
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
+
+        queryset = self.filter_queryset(self.get_queryset())
+        if queryset._prefetch_related_lookups:
+            instance._prefetched_objects_cache = {}
+            prefetch_related_objects(
+                [instance], *queryset._prefetch_related_lookups
+            )
         return Response(serializer.data)
 
     def perform_update(self, serializer):

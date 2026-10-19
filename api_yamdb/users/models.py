@@ -28,11 +28,6 @@ class User(AbstractUser):
         verbose_name='Роль'
     )
     bio = models.TextField(blank=True, verbose_name='О себе')
-    confirmation_code = models.CharField(
-        max_length=100,
-        blank=True,
-        verbose_name='Код подтверждения'
-    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']

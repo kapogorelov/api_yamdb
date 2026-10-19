@@ -1,6 +1,5 @@
-import uuid
-
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
@@ -126,9 +125,7 @@ class SignUpView(APIView):
         serializer = SignUpSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        confirmation_code = str(uuid.uuid4())
-        user.confirmation_code = confirmation_code
-        user.save()
+        confirmation_code = default_token_generator.make_token(user)
         send_mail(
             subject='Код подтверждения YaMDb',
             message=f'Ваш код подтверждения: {confirmation_code}',
@@ -150,6 +147,13 @@ class TokenView(APIView):
             return Response(
                 {'username': 'Пользователь не найден.'},
                 status=status.HTTP_404_NOT_FOUND
+            )
+        if not default_token_generator.check_token(
+            user, serializer.validated_data['confirmation_code']
+        ):
+            return Response(
+                {'confirmation_code': 'Неверный код подтверждения.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
         token = AccessToken.for_user(user)
         return Response({'token': str(token)}, status=status.HTTP_200_OK)
