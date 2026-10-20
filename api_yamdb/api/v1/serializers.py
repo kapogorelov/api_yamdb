@@ -1,8 +1,9 @@
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
 from rest_framework import serializers
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.validators import UniqueValidator
 
 from api.v1.validators import UsernameValidatorMixin
@@ -150,10 +151,12 @@ class TokenSerializer(serializers.Serializer):
         try:
             user = User.objects.get(username=username)
         except User.DoesNotExist:
-            data['user'] = None
-            return data
+            raise NotFound({'username': 'Пользователь не найден.'})
+        if not default_token_generator.check_token(user, confirmation_code):
+            raise ValidationError(
+                {'confirmation_code': 'Неверный код подтверждения.'}
+            )
         data['user'] = user
-        data['confirmation_code'] = confirmation_code
         return data
 
 

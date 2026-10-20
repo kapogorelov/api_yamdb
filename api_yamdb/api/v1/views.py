@@ -4,11 +4,10 @@ from django.core.mail import send_mail
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, mixins, status, viewsets
-from rest_framework.decorators import action
+from rest_framework import filters, mixins, serializers, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import AccessToken
 
 from api.v1.filters import TitleFilter
@@ -48,7 +47,7 @@ class GenreViewSet(CategoryGenreBaseViewSet):
     serializer_class = GenreSerializer
 
 
-class TitleViewSet(
+class BaseTitleReviewCommentViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -56,6 +55,11 @@ class TitleViewSet(
     PatchModelMixin,
     viewsets.GenericViewSet,
 ):
+    """Базовый вьюсет для произведений, отзывов и комментариев."""
+    pass
+
+
+class TitleViewSet(BaseTitleReviewCommentViewSet):
     queryset = (
         Title.objects.annotate(rating=Avg('reviews__score'))
         .select_related('category').prefetch_related('genre')
@@ -70,14 +74,7 @@ class TitleViewSet(
         return TitleWriteSerializer
 
 
-class ReviewViewSet(
-    mixins.CreateModelMixin,
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
-    PatchModelMixin,
-    viewsets.GenericViewSet,
-):
+class ReviewViewSet(BaseTitleReviewCommentViewSet):
     serializer_class = ReviewSerializer
     permission_classes = (IsAdminModeratorOwnerOrReadOnly,)
 
@@ -91,14 +88,7 @@ class ReviewViewSet(
         serializer.save(author=self.request.user, title=self.get_title())
 
 
-class CommentViewSet(
-    mixins.CreateModelMixin,
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
-    mixins.DestroyModelMixin,
-    PatchModelMixin,
-    viewsets.GenericViewSet,
-):
+class CommentViewSet(BaseTitleReviewCommentViewSet):
     serializer_class = CommentSerializer
     permission_classes = (IsAdminModeratorOwnerOrReadOnly,)
 
@@ -118,45 +108,31 @@ class CommentViewSet(
         )
 
 
-class SignUpView(APIView):
-    permission_classes = (AllowAny,)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def signup(request):
+    serializer = SignUpSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.save()
+    confirmation_code = default_token_generator.make_token(user)
+    send_mail(
+        subject='Код подтверждения YaMDb',
+        message=f'Ваш код подтверждения: {confirmation_code}',
+        from_email='yamdb@example.com',
+        recipient_list=[user.email],
+        fail_silently=False,
+    )
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        serializer = SignUpSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        confirmation_code = default_token_generator.make_token(user)
-        send_mail(
-            subject='Код подтверждения YaMDb',
-            message=f'Ваш код подтверждения: {confirmation_code}',
-            from_email='yamdb@example.com',
-            recipient_list=[user.email],
-            fail_silently=False,
-        )
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
-
-class TokenView(APIView):
-    permission_classes = (AllowAny,)
-
-    def post(self, request):
-        serializer = TokenSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data.get('user')
-        if not user:
-            return Response(
-                {'username': 'Пользователь не найден.'},
-                status=status.HTTP_404_NOT_FOUND
-            )
-        if not default_token_generator.check_token(
-            user, serializer.validated_data['confirmation_code']
-        ):
-            return Response(
-                {'confirmation_code': 'Неверный код подтверждения.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        token = AccessToken.for_user(user)
-        return Response({'token': str(token)}, status=status.HTTP_200_OK)
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def token(request):
+    serializer = TokenSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user = serializer.validated_data['user']
+    access_token = AccessToken.for_user(user)
+    return Response({'token': str(access_token)}, status=status.HTTP_200_OK)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -169,20 +145,24 @@ class UserViewSet(viewsets.ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
-        methods=['get', 'patch'],
+        methods=['get'],
         detail=False,
         permission_classes=(IsAuthenticated,),
         url_path='me'
     )
     def me(self, request):
+        return Response(self.get_serializer(request.user).data)
+
+    @me.mapping.patch
+    def me_patch(self, request):
         user = request.user
-        if request.method == 'GET':
-            return Response(self.get_serializer(user).data)
         serializer = self.get_serializer(
             user, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
         if 'role' in serializer.validated_data and not user.is_admin:
-            serializer.validated_data.pop('role')
+            raise serializers.ValidationError(
+                {'role': 'Изменять роль может только администратор.'}
+            )
         serializer.save()
         return Response(serializer.data)
