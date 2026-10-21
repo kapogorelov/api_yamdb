@@ -56,7 +56,6 @@ class BaseTitleReviewCommentViewSet(
     viewsets.GenericViewSet,
 ):
     """Базовый вьюсет для произведений, отзывов и комментариев."""
-    pass
 
 
 class TitleViewSet(BaseTitleReviewCommentViewSet):
@@ -135,14 +134,20 @@ def token(request):
     return Response({'token': str(access_token)}, status=status.HTTP_200_OK)
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    PatchModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = User.objects.all().order_by('id')
     serializer_class = UserSerializer
     permission_classes = (IsAdmin,)
     lookup_field = 'username'
     filter_backends = (filters.SearchFilter,)
     search_fields = ('username',)
-    http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
         methods=['get'],
@@ -160,15 +165,6 @@ class UserViewSet(viewsets.ModelViewSet):
             user, data=request.data, partial=True
         )
         serializer.is_valid(raise_exception=True)
-        # Явно возвращаем 400, а не игнорируем поле role.
-        # Молчаливое игнорирование (pop + подстановка роли из request.user)
-        # ломает тесты, я проверил уже несколько раз: они ожидают статус 400,
-        # если обычный пользователь пытается изменить себе роль.
-        # Текущий подход будет соответствовать API и требованиям тестов.
-        # Иначе я между двух огней -- между заданием и тестами.
-        if 'role' in serializer.validated_data and not user.is_admin:
-            raise serializers.ValidationError(
-                {'role': 'Изменять роль может только администратор.'}
-            )
+        serializer.validated_data.pop('role', None)
         serializer.save()
         return Response(serializer.data)
